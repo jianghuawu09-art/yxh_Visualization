@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>亿星汇数据可视化大屏 - 登录</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { background:#0a192f; color:white; font-family:Arial; }
+
+        /* 登录页面 */
+        .login-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .login-box {
+            background:rgba(0,110,170,0.2);
+            border:1px solid #00d4ff;
+            padding:40px;
+            border-radius:10px;
+            width:400px;
+        }
+        .login-box h2 {
+            text-align:center;
+            color:#00d4ff;
+            margin-bottom:20px;
+        }
+        .input-group {
+            margin-bottom:15px;
+        }
+        .input-group input {
+            width:100%;
+            padding:12px;
+            background:rgba(0,110,170,0.2);
+            border:1px solid #00d4ff;
+            color:white;
+            font-size:16px;
+            border-radius:6px;
+        }
+        .login-btn {
+            width:100%;
+            padding:12px;
+            background:#00d4ff;
+            color:#0a192f;
+            font-size:16px;
+            font-weight:bold;
+            border:none;
+            border-radius:6px;
+            cursor:pointer;
+        }
+        .tip {
+            color:red;
+            text-align:center;
+            margin-top:10px;
+            display:none;
+        }
+
+        /* 主页面布局：侧边栏 + 内容区 */
+        .main-container {
+            display: none;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+        }
+        /* 侧边栏（缩小宽度，给主内容区腾空间） */
+        .sidebar {
+            width: 150px;
+            background: rgba(0,110,170,0.15);
+            border-right: 1px solid #00d4ff;
+            padding: 20px 0;
+        }
+        .sidebar-title {
+            text-align: center;
+            color: #00d4ff;
+            font-size: 18px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(0,212,255,0.3);
+            margin-bottom: 20px;
+        }
+        .menu-item {
+            padding: 12px 15px;
+            color: #fff;
+            cursor: pointer;
+            border-left: 3px solid transparent;
+            transition: all 0.3s;
+            font-size:14px;
+        }
+        .menu-item.active {
+            background: rgba(0,212,255,0.2);
+            border-left-color: #00d4ff;
+            color: #00d4ff;
+        }
+        .menu-item:hover {
+            background: rgba(0,212,255,0.1);
+        }
+
+        /* 内容区 */
+        .content-area {
+            flex: 1;
+            padding: 20px;
+            height: 100vh;
+            overflow-y: auto;
+        }
+        .title {
+            text-align:center;
+            font-size:26px;
+            color:#00d4ff;
+            margin-bottom:20px;
+        }
+        .top {
+            display:flex;
+            gap:15px;
+            margin-bottom:20px;
+        }
+        .card {
+            flex:1;
+            background:rgba(0,110,170,0.2);
+            border:1px solid #00d4ff;
+            padding:20px;
+            border-radius:8px;
+            text-align:center;
+        }
+        .num {
+            font-size:30px;
+            font-weight:bold;
+            color:#fff;
+        }
+        .label {
+            font-size:14px;
+            color:#ccc;
+            margin-top:5px;
+        }
+        .charts {
+            display:flex;
+            gap:15px;
+            height:calc(100vh - 220px); /* 增大高度，给图表更多空间 */
+        }
+        .left,.right {
+            width:25%;
+            display:flex;
+            flex-direction:column;
+            gap:15px;
+        }
+        .middle {
+            width:50%;
+        }
+        .box {
+            flex:1;
+            background:rgba(0,110,170,0.1);
+            border:1px solid #00d4ff;
+            border-radius:8px;
+            padding:15px;
+            min-height: 250px; /* 强制最小高度，防止被压缩 */
+        }
+        .box h3 {
+            color:#00d4ff;
+            margin-bottom:10px;
+        }
+        .chart {
+            width:100%;
+            height:calc(100% - 30px);
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- 登录界面 -->
+    <div class="login-container" id="loginBox">
+        <div class="login-box">
+            <h2>亿星汇数据可视化大屏登录</h2>
+            <div class="input-group">
+                <input type="text" id="username" placeholder="请输入账号">
+            </div>
+            <div class="input-group">
+                <input type="password" id="password" placeholder="请输入密码">
+            </div>
+            <button class="login-btn" onclick="login()">登录</button>
+            <div class="tip" id="errTip">账号或密码错误</div>
+        </div>
+    </div>
+
+    <!-- 主页面：侧边栏 + 内容区 -->
+    <div class="main-container" id="mainPage" style="display:none;">
+        <!-- 左侧侧边栏菜单 -->
+        <div class="sidebar">
+            <div class="sidebar-title">系统菜单</div>
+            <div class="menu-item active" onclick="switchPage('saleReturn')">销售退货可视化大屏</div>
+            <!-- 后续要加的新菜单，直接复制下面这行改名字就行 -->
+            <div class="menu-item" onclick="switchPage('other')">其他看板-暂无功能后续添加</div>
+            <div class="menu-item" onclick="switchPage('other2')">其他看板2-暂无功能后续添加</div>
+        </div>
+
+        <!-- 右侧内容区 -->
+        <div class="content-area">
+            <!-- 销售退货看板（当前页面） -->
+            <div id="saleReturnPage">
+                <div class="title">销售退货可视化大屏</div>
+                <div class="top">
+                    <div class="card"><div class="num" id="totalSale">0</div><div class="label">总销售</div></div>
+                    <div class="card"><div class="num" id="totalRefund">0</div><div class="label">总退货</div></div>
+                    <div class="card"><div class="num" id="refundRate">0</div><div class="label">退货率</div></div>
+                    <div class="card"><div class="num" id="totalStyle">0</div><div class="label">总款式</div></div>
+                </div>
+                <div class="charts">
+                    <div class="left">
+                        <div class="box"><h3>退货原因</h3><div id="pie1" class="chart"></div></div>
+                        <div class="box"><h3>尺码销量</h3><div id="barH" class="chart"></div></div>
+                    </div>
+                    <div class="middle">
+                        <div class="box"><h3>月度退货趋势</h3><div id="line" class="chart"></div></div>
+                    </div>
+                    <div class="right">
+                        <div class="box"><h3>颜色分布</h3><div id="pie2" class="chart"></div></div>
+                        <div class="box"><h3>款式销量</h3><div id="bar" class="chart"></div></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 后续要加的其他看板，放在这里，默认隐藏 -->
+            <!-- <div id="otherPage" style="display:none;">
+                <div class="title">其他看板标题</div>
+                这里放新的图表内容
+            </div> -->
+        </div>
+    </div>
+
+    <script>
+        // ====================== 多用户登录配置 ======================
+        const USER_LIST = [
+            { user: "admin", pwd: "123456" },
+            { user: "zhangsan", pwd: "123" },
+            { user: "lisi", pwd: "456" },
+            { user: "wujianghua", pwd: "wjh123" }
+        ];
+
+        let chart1,chart2,chart3,chart4,chart5;
+
+        // 初始化销售退货看板的图表
+        function initCharts(){
+            chart1 = echarts.init(document.getElementById('line'))
+            chart2 = echarts.init(document.getElementById('pie1'))
+            chart3 = echarts.init(document.getElementById('barH'))
+            chart4 = echarts.init(document.getElementById('pie2'))
+            chart5 = echarts.init(document.getElementById('bar'))
+        }
+
+        // 加载销售退货数据
+        async function load(){
+            const res = await axios.get("http://127.0.0.1:8000/api/data")
+            const data = res.data
+
+            let totalSale=0, totalRefund=0
+            let month={}, reason={}, size={}, color={}, style={}
+
+            data.forEach(row=>{
+                let s = +row.销售数量||0
+                let r = +row.退货数量||0
+                totalSale+=s
+                totalRefund+=r
+                month[row.月份] = (month[row.月份]||0)+r
+                reason[row.退货原因] = (reason[row.退货原因]||0)+r
+                size[row.尺码] = (size[row.尺码]||0)+s
+                color[row.颜色] = (color[row.颜色]||0)+r
+                style[row.品名] = (style[row.品名]||0)+s
+            })
+
+            let rate = totalSale>0 ? (totalRefund/totalSale*100).toFixed(1)+'%' : '0%'
+            document.getElementById('totalSale').innerText = totalSale
+            document.getElementById('totalRefund').innerText = totalRefund
+            document.getElementById('refundRate').innerText = rate
+            document.getElementById('totalStyle').innerText = Object.keys(style).length
+
+            // 月度趋势图
+            chart1.setOption({
+                backgroundColor: 'transparent',
+                grid: { left: '5%', right: '5%', bottom: '10%', containLabel: true },
+                xAxis:{
+                    type: 'category',
+                    data: Object.keys(month),
+                    axisLine: { lineStyle: { color: '#00d4ff' } }
+                },
+                yAxis:{
+                    type: 'value',
+                    axisLine: { lineStyle: { color: '#00d4ff' } },
+                    splitLine: { lineStyle: { color: 'rgba(0,212,255,0.2)' } }
+                },
+                series:[{
+                    type:'line',
+                    smooth: true,
+                    data: Object.values(month),
+                    lineStyle: { color: '#00d4ff' },
+                    areaStyle: { color: 'rgba(0,212,255,0.2)' }
+                }]
+            })
+
+            // 退货原因环形图（优化标签显示）
+            chart2.setOption({
+                backgroundColor: 'transparent',
+                series:[{
+                    type:'pie',
+                    radius: ['40%','70%'],
+                    center: ['50%','50%'],
+                    data: Object.keys(reason).map(k=>({name:k,value:reason[k]})),
+                    label: {
+                        color: '#fff',
+                        fontSize: 12,
+                        formatter: '{b}\n({c})' // 换行显示，避免标签被截断
+                    }
+                }]
+            })
+
+            // 尺码销量横向条形图（优化y轴标签显示）
+            chart3.setOption({
+                backgroundColor: 'transparent',
+                grid: { left: '15%', right: '10%', bottom: '3%', containLabel: true },
+                xAxis:{
+                    type: 'value',
+                    axisLine: { lineStyle: { color: '#00d4ff' } },
+                    splitLine: { lineStyle: { color: 'rgba(0,212,255,0.2)' } }
+                },
+                yAxis:{
+                    type: 'category',
+                    data: Object.keys(size),
+                    axisLine: { lineStyle: { color: '#00d4ff' } }
+                },
+                series:[{
+                    type:'bar',
+                    data: Object.values(size),
+                    itemStyle: { color: '#00d4ff' }
+                }]
+            })
+
+            // 颜色分布饼图（优化标签显示）
+            chart4.setOption({
+                backgroundColor: 'transparent',
+                series:[{
+                    type:'pie',
+                    radius: ['40%','70%'],
+                    center: ['50%','50%'],
+                    data: Object.keys(color).map(k=>({name:k,value:color[k]})),
+                    label: {
+                        color: '#fff',
+                        fontSize: 12,
+                        formatter: '{b}\n({c})' // 换行显示，避免标签被截断
+                    }
+                }]
+            })
+
+            // 款式销量柱状图（优化x轴标签显示）
+            chart5.setOption({
+                backgroundColor: 'transparent',
+                grid: { left: '5%', right: '5%', bottom: '15%', containLabel: true },
+                xAxis:{
+                    type: 'category',
+                    data: Object.keys(style),
+                    axisLine: { lineStyle: { color: '#00d4ff' } },
+                    axisLabel: { rotate: 30 } // 标签旋转，避免重叠
+                },
+                yAxis:{
+                    type: 'value',
+                    axisLine: { lineStyle: { color: '#00d4ff' } },
+                    splitLine: { lineStyle: { color: 'rgba(0,212,255,0.2)' } }
+                },
+                series:[{
+                    type:'bar',
+                    data: Object.values(style),
+                    itemStyle: { color: '#1890ff' }
+                }]
+            })
+        }
+
+        // ====================== 页面切换函数 ======================
+        function switchPage(pageId){
+            // 1. 所有菜单取消高亮
+            document.querySelectorAll('.menu-item').forEach(item=>{
+                item.classList.remove('active')
+            })
+            // 2. 所有页面隐藏
+            document.querySelectorAll('.content-area > div').forEach(page=>{
+                page.style.display = 'none'
+            })
+            // 3. 高亮当前菜单，显示对应页面
+            event.target.classList.add('active')
+            document.getElementById(pageId + 'Page').style.display = 'block'
+
+            // 如果是销售退货页面，重新初始化图表（防止显示异常）
+            if(pageId === 'saleReturn'){
+                // 销毁旧图表，防止报错
+                if(chart1) chart1.dispose()
+                if(chart2) chart2.dispose()
+                if(chart3) chart3.dispose()
+                if(chart4) chart4.dispose()
+                if(chart5) chart5.dispose()
+                // 重新初始化并加载数据
+                initCharts()
+                load()
+            }
+        }
+
+        // ====================== 登录函数 ======================
+        function login(){
+            let user = document.getElementById("username").value
+            let pwd = document.getElementById("password").value
+
+            let check = USER_LIST.some(item => item.user === user && item.pwd === pwd);
+
+            if(check){
+                document.getElementById("loginBox").style.display = "none"
+                document.getElementById("mainPage").style.display = "flex"
+                // 登录成功后，默认加载销售退货看板
+                initCharts()
+                load()
+                // 监听窗口变化，图表自适应
+                window.addEventListener('resize', function(){
+                    chart1?.resize()
+                    chart2?.resize()
+                    chart3?.resize()
+                    chart4?.resize()
+                    chart5?.resize()
+                })
+            }else{
+                document.getElementById("errTip").style.display = "block"
+            }
+        }
+    </script>
+</body>
+</html>
