@@ -6,6 +6,8 @@
     <title>亿星汇 | 服饰销售退货分析系统</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+    <!-- 引入独立翻译映射文件 -->
+    <script src="translate_map.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: radial-gradient(circle at 20% 30%, #0A1620, #03090F); font-family: 'Microsoft YaHei', sans-serif; overflow: hidden; height: 100vh; width: 100vw; }
@@ -23,6 +25,7 @@
         .sidebar-title { text-align: center; font-size: 20px; color: #E2CD9C; padding: 28px 0 20px; border-bottom: 1px solid rgba(198,168,98,0.4); }
         .menu-item { padding: 16px 20px; color: #CCD6E0; font-size: 15px; cursor: pointer; border-left: 3px solid transparent; transition: all 0.25s; margin: 6px 12px; border-radius: 40px; }
         .menu-item.active { background: rgba(198, 168, 98, 0.2); color: #F2DEA2; border-left-color: #C6A862; }
+
         .content-area { flex: 1; overflow-y: auto; padding: 20px 28px 28px 28px; }
         .dashboard-title { text-align: center; font-size: 32px; color: #F4E5C7; margin-bottom: 26px; }
         .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; margin-bottom: 32px; }
@@ -47,7 +50,65 @@
         .remark-table { width: 100%; border-collapse: collapse; font-size: 12px; color: #DBE2EA; }
         .remark-table th { text-align: left; padding: 10px 6px; color: #E8CF93; border-bottom: 1px solid rgba(198,168,98,0.4); }
         .remark-table td { padding: 9px 6px; border-bottom: 1px solid rgba(198,168,98,0.2); }
+        /* 新增：退货原因明细页面样式 */
+        .reason-detail-section { background: rgba(8, 22, 34, 0.7); border-radius: 28px; border: 1px solid rgba(198,168,98,0.45); padding: 18px 20px; margin-top: 12px; }
+        .reason-detail-table { width: 100%; border-collapse: collapse; font-size: 12px; color: #DBE2EA; }
+        .reason-detail-table th { text-align: left; padding: 10px 6px; color: #E8CF93; border-bottom: 1px solid rgba(198,168,98,0.4); }
+        .reason-detail-table td { padding: 9px 6px; border-bottom:  1px solid rgba(198,168,98,0.2); }
+        /* 明细顶部统计行样式 */
+        .detail-total-info {
+            color: #F3D77C;
+            font-size: 14px;
+            margin-bottom: 12px;
+            padding: 8px 10px;
+            border: 1px dashed rgba(198,168,98,0.4);
+            border-radius: 8px;
+            display: flex;
+            gap: 30px;
+        }
+        /* IP拦截提示样式 */
+        .ip-block {
+            width:100vw;height:100vh;display:flex;align-items:center;justify-content:center;
+            background:#02090f;color:#f44336;font-size:24px;
+        }
     </style>
+        <!-- ========== IP白名单配置 开始 ========== -->
+    <script>
+        // 1. 在这里配置允许访问的IP白名单（替换成你实际的内网/公网IP）
+        const IP_WHITE_LIST = [
+            "127.0.0.1",        // 本机
+            "192.168.1.100",    // 示例内网IP1
+            "192.168.1.101"     // 示例内网IP2
+        ];
+
+        // 2. 校验IP函数
+        async function checkIPAccess() {
+            try {
+                // 调用公共接口获取客户端公网IP
+                const res = await fetch("https://api.ipify.org?format=json");
+                const data = await res.json();
+                const clientIP = data.ip;
+
+                // 判断是否在白名单内
+                if (!IP_WHITE_LIST.includes(clientIP)) {
+                    // IP不在白名单，拦截页面
+                    document.body.innerHTML = `<div class="ip-block">拒绝访问：当前设备IP【${clientIP}】不在访问白名单中</div>`;
+                    return false;
+                }
+                return true;
+            } catch (e) {
+                // 接口异常（断网/内网无外网），默认放行（内网场景常用）
+                console.log("IP获取失败，默认放行");
+                return true;
+            }
+        }
+
+        // 页面加载立即执行IP校验
+        window.onload = async function() {
+            await checkIPAccess();
+        }
+    </script>
+    <!-- ========== IP白名单配置 结束 ========== -->
 </head>
 <body>
     <!-- 登录界面 -->
@@ -70,9 +131,12 @@
         <div class="sidebar">
             <div class="sidebar-title">系统菜单</div>
             <div class="menu-item active" onclick="switchPage('saleReturn')">销售退货可视化大屏</div>
+            <!-- 新增菜单选项 -->
+            <div class="menu-item" onclick="switchPage('reasonDetail')">退货原因明细分析</div>
         </div>
 
         <div class="content-area">
+            <!-- 原有销售退货页面 -->
             <div id="saleReturnPage">
                 <div class="dashboard-title">服饰销售退货数据可视化大屏</div>
                 
@@ -87,25 +151,30 @@
                 <!-- 主体区域：6个图表 + 右侧筛选栏 -->
                 <div class="visual-layout">
                     <div class="charts-matrix">
-                        <div class="chart-card"><h4>📈 月度退货趋势</h4><div id="trendLine" class="chart-box"></div></div>
-                        <div class="chart-card"><h4>📏 不同尺码销量</h4><div id="sizeBarH" class="chart-box"></div></div>
-                        <div class="chart-card"><h4>⚠️ 退货原因占比</h4><div id="reasonPie" class="chart-box"></div></div>
-                        <div class="chart-card"><h4>🎨 颜色退货分布</h4><div id="colorPie" class="chart-box"></div></div>
-                        <div class="chart-card"><h4>🏬 各店铺销量对比</h4><div id="storeBar" class="chart-box"></div></div>
-                        <div class="chart-card"><h4>🌍 海外各国销量</h4><div id="countryBar" class="chart-box"></div></div>
+                        <div class="chart-card"><h4>📈 退货率趋势</h4><div id="trendLine" class="chart-box"></div></div>
+                        <div class="chart-card"><h4>📏 不同尺码占比（前十条数据展示）</h4><div id="sizeBarH" class="chart-box"></div></div>
+                        <div class="chart-card"><h4>⚠️ 退货原因占比（低于3%汇总到[其他]）</h4><div id="reasonPie" class="chart-box"></div></div>
+                        <div class="chart-card"><h4>🎨 颜色退货分布（前十条数据展示）</h4><div id="colorPie" class="chart-box"></div></div>
+                        <!-- 恢复：各店铺销量对比 -->
+                        <div class="chart-card"><h4>🏬 各店铺销量对比（低于2%汇总到其他店铺）</h4><div id="storeBar" class="chart-box"></div></div>
+                        <!-- 恢复：各国家退货率对比 -->
+                        <div class="chart-card"><h4>🌍 各国家退货率对比</h4><div id="countryBar" class="chart-box"></div></div>
                     </div>
 
-                    <!-- 右侧筛选栏（完全匹配你的Excel字段） -->
+                    <!-- 右侧筛选栏 【新增 国家、店铺 筛选】 -->
                     <div class="filter-panel">
                         <div class="filter-header">🔍 数据筛选</div>
                         <div class="filter-row"><label>年份</label><select id="filterYear"><option>全部</option></select></div>
                         <div class="filter-row"><label>月份</label><select id="filterMonth"><option>全部</option></select></div>
-                        <div class="filter-row"><label>分类</label><select id="filterCategory"><option>全部</option></select></div>
-                        <div class="filter-row"><label>品名</label><select id="filterProduct"><option>全部</option></select></div>
-                        <div class="filter-row"><label>店铺</label><select id="filterStore"><option>全部</option></select></div>
+                        <div class="filter-row"><label>一级分类</label><select id="filterCategory"><option>全部</option></select></div>
+                        <div class="filter-row"><label>二级分类</label><select id="filterSubCategory"><option>全部</option></select></div>
+                        <div class="filter-row"><label>三级分类</label><select id="filterThirdCategory"><option>全部</option></select></div>
                         <div class="filter-row"><label>颜色</label><select id="filterColor"><option>全部</option></select></div>
-                        <div class="filter-row"><label>国家</label><select id="filterCountry"><option>全部</option></select></div>
                         <div class="filter-row"><label>尺码</label><select id="filterSize"><option>全部</option></select></div>
+                        <!-- 新增国家筛选 -->
+                        <div class="filter-row"><label>国家</label><select id="filterCountry"><option>全部</option></select></div>
+                        <!-- 新增店铺筛选 -->
+                        <div class="filter-row"><label>店铺</label><select id="filterStore"><option>全部</option></select></div>
                         <div class="filter-actions">
                             <div class="filter-btn reset" onclick="resetFilters()">重置</div>
                             <div class="filter-btn" onclick="applyFilters()">应用</div>
@@ -118,10 +187,59 @@
                     <div class="remark-title">📋 退货备注数据列表（最新5条）</div>
                     <table class="remark-table" id="remarkTable">
                         <thead>
-                            <tr><th>年份</th><th>月份</th><th>品名</th><th>店铺</th><th>颜色</th><th>尺码</th><th>退货原因</th><th>退货备注</th></tr>
+                            <tr><th>年份</th><th>月份</th><th>品名</th><th>一级分类</th><th>二级分类</th><th>三级分类</th><th>颜色</th><th>尺码</th><th>退货原因</th><th>退货备注</th></tr>
                         </thead>
                         <tbody id="remarkTbody">
-                            <tr><td colspan="8">加载中...</td></tr>
+                            <tr><td colspan="10">加载中...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 新增：退货原因明细分析页面 -->
+            <div id="reasonDetailPage" style="display:none;">
+                <div class="dashboard-title">退货原因明细分析</div>
+                
+                <!-- 筛选栏 【同步新增 国家、店铺】 -->
+                <div class="filter-panel" style="max-width: 400px; margin: 0 auto 20px;">
+                    <div class="filter-header">🔍 数据筛选</div>
+                    <div class="filter-row"><label>年份</label><select id="detailFilterYear"><option>全部</option></select></div>
+                    <div class="filter-row"><label>月份</label><select id="detailFilterMonth"><option>全部</option></select></div>
+                    <div class="filter-row"><label>一级分类</label><select id="detailFilterCategory"><option>全部</option></select></div>
+                    <div class="filter-row"><label>二级分类</label><select id="detailFilterSubCategory"><option>全部</option></select></div>
+                    <div class="filter-row"><label>三级分类</label><select id="detailFilterThirdCategory"><option>全部</option></select></div>
+                    <div class="filter-row"><label>颜色</label><select id="detailFilterColor"><option>全部</option></select></div>
+                    <div class="filter-row"><label>尺码</label><select id="detailFilterSize"><option>全部</option></select></div>
+                    <!-- 明细页新增国家筛选 -->
+                    <div class="filter-row"><label>国家</label><select id="detailFilterCountry"><option>全部</option></select></div>
+                    <!-- 明细页新增店铺筛选 -->
+                    <div class="filter-row"><label>店铺</label><select id="detailFilterStore"><option>全部</option></select></div>
+                    <div class="filter-actions">
+                        <div class="filter-btn reset" onclick="resetDetailFilters()">重置</div>
+                        <div class="filter-btn" onclick="applyDetailFilters()">应用</div>
+                    </div>
+                </div>
+
+                <!-- 退货原因明细表格 -->
+                <div class="reason-detail-section">
+                    <!-- 顶部统计：数据总条数 + 尺码汇总 -->
+                    <div class="detail-total-info" id="detailTotalInfo">
+                        <span>数据总条数：0</span>
+                        <span>尺码分布：暂无数据</span>
+                    </div>
+
+                    <div class="remark-title">📋 退货原因 & 备注明细（按出现次数排序）</div>
+                    <table class="reason-detail-table" id="reasonDetailTable">
+                        <thead>
+                            <tr>
+                                <th>尺码</th>
+                                <th>退货原因</th>
+                                <th>原始备注（英译中）</th>
+                                <th>出现次数</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reasonDetailTbody">
+                            <tr><td colspan="4">加载中...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -168,19 +286,19 @@
         // 从后端实时读取数据
         async function loadDataFromBackend() {
             try {
-                // 本地调试用地址，部署时替换为cpolar地址：https://c31198f.r18.cpolar.top/api/data
                 const res = await axios.get("http://127.0.0.1:8000/api/data");
                 rawData = res.data || [];
                 console.log("读取到的数据：", rawData);
-                initFilterOptions(); // 初始化筛选下拉选项
-                applyFilters(); // 初次渲染数据
+                initFilterOptions(); 
+                initDetailFilterOptions(); 
+                applyFilters(); 
             } catch (error) {
                 console.error("后端数据读取失败：", error);
                 alert("数据加载失败，请检查后端是否正常运行");
             }
         }
 
-        // 初始化筛选下拉选项（根据Excel数据自动填充）
+        // 初始化主页面筛选下拉选项（新增 国家、店铺）
         function initFilterOptions() {
             if(!rawData.length) return;
             // 年份
@@ -191,75 +309,168 @@
             const months = [...new Set(rawData.map(row => row.月份))].sort((a,b)=>a-b);
             const monthSelect = document.getElementById('filterMonth');
             months.forEach(m => monthSelect.innerHTML += `<option value="${m}">${m}月</option>`);
-            // 分类
-            const categories = [...new Set(rawData.map(row => row.分类))];
+            // 一级分类
+            const categories = [...new Set(rawData.map(row => row.一级分类))];
             const categorySelect = document.getElementById('filterCategory');
             categories.forEach(c => categorySelect.innerHTML += `<option value="${c}">${c}</option>`);
-            // 品名
-            const products = [...new Set(rawData.map(row => row.品名))];
-            const productSelect = document.getElementById('filterProduct');
-            products.forEach(p => productSelect.innerHTML += `<option value="${p}">${p}</option>`);
-            // 店铺
-            const stores = [...new Set(rawData.map(row => row.店铺))];
-            const storeSelect = document.getElementById('filterStore');
-            stores.forEach(s => storeSelect.innerHTML += `<option value="${s}">${s}</option>`);
+            // 二级分类
+            const subCategories = [...new Set(rawData.map(row => row.二级分类))];
+            const subCategorySelect = document.getElementById('filterSubCategory');
+            subCategories.forEach(c => subCategorySelect.innerHTML += `<option value="${c}">${c}</option>`);
+            // 三级分类
+            const thirdCategories = [...new Set(rawData.map(row => row.三级分类))];
+            const thirdCategorySelect = document.getElementById('filterThirdCategory');
+            thirdCategories.forEach(c => thirdCategorySelect.innerHTML += `<option value="${c}">${c}</option>`);
             // 颜色
             const colors = [...new Set(rawData.map(row => row.颜色))];
             const colorSelect = document.getElementById('filterColor');
             colors.forEach(c => colorSelect.innerHTML += `<option value="${c}">${c}</option>`);
-            // 国家
-            const countries = [...new Set(rawData.map(row => row.国家))];
-            const countrySelect = document.getElementById('filterCountry');
-            countries.forEach(c => countrySelect.innerHTML += `<option value="${c}">${c}</option>`);
             // 尺码
             const sizes = [...new Set(rawData.map(row => row.尺码))];
             const sizeSelect = document.getElementById('filterSize');
             sizes.forEach(s => sizeSelect.innerHTML += `<option value="${s}">${s}</option>`);
+            // 国家
+            const countries = [...new Set(rawData.map(row => row.国家))];
+            const countrySelect = document.getElementById('filterCountry');
+            countries.forEach(c => countrySelect.innerHTML += `<option value="${c}">${c}</option>`);
+            // 店铺
+            const stores = [...new Set(rawData.map(row => row.店铺))];
+            const storeSelect = document.getElementById('filterStore');
+            stores.forEach(s => storeSelect.innerHTML += `<option value="${s}">${s}</option>`);
         }
 
-        // 应用筛选
+        // 初始化明细页面筛选下拉选项（新增 国家、店铺）
+        function initDetailFilterOptions() {
+            if(!rawData.length) return;
+            // 年份
+            const years = [...new Set(rawData.map(row => row.年份))].sort();
+            const yearSelect = document.getElementById('detailFilterYear');
+            years.forEach(y => yearSelect.innerHTML += `<option value="${y}">${y}</option>`);
+            // 月份
+            const months = [...new Set(rawData.map(row => row.月份))].sort((a,b)=>a-b);
+            const monthSelect = document.getElementById('detailFilterMonth');
+            months.forEach(m => monthSelect.innerHTML += `<option value="${m}">${m}月</option>`);
+            // 一级分类
+            const categories = [...new Set(rawData.map(row => row.一级分类))];
+            const categorySelect = document.getElementById('detailFilterCategory');
+            categories.forEach(c => categorySelect.innerHTML += `<option value="${c}">${c}</option>`);
+            // 二级分类
+            const subCategories = [...new Set(rawData.map(row => row.二级分类))];
+            const subCategorySelect = document.getElementById('detailFilterSubCategory');
+            subCategories.forEach(c => subCategorySelect.innerHTML += `<option value="${c}">${c}</option>`);
+            // 三级分类
+            const thirdCategories = [...new Set(rawData.map(row => row.三级分类))];
+            const thirdCategorySelect = document.getElementById('detailFilterThirdCategory');
+            thirdCategories.forEach(c => thirdCategorySelect.innerHTML += `<option value="${c}">${c}</option>`);
+            // 颜色
+            const colors = [...new Set(rawData.map(row => row.颜色))];
+            const colorSelect = document.getElementById('detailFilterColor');
+            colors.forEach(c => colorSelect.innerHTML += `<option value="${c}">${c}</option>`);
+            // 尺码
+            const sizes = [...new Set(rawData.map(row => row.尺码))];
+            const sizeSelect = document.getElementById('detailFilterSize');
+            sizes.forEach(s => sizeSelect.innerHTML += `<option value="${s}">${s}</option>`);
+            // 国家
+            const countries = [...new Set(rawData.map(row => row.国家))];
+            const countrySelect = document.getElementById('detailFilterCountry');
+            countries.forEach(c => countrySelect.innerHTML += `<option value="${c}">${c}</option>`);
+            // 店铺
+            const stores = [...new Set(rawData.map(row => row.店铺))];
+            const storeSelect = document.getElementById('detailFilterStore');
+            stores.forEach(s => storeSelect.innerHTML += `<option value="${s}">${s}</option>`);
+        }
+
+        // 主页面应用筛选（增加国家、店铺判断）
         function applyFilters() {
             if(!rawData.length) return;
             const year = document.getElementById('filterYear').value;
             const month = document.getElementById('filterMonth').value;
             const category = document.getElementById('filterCategory').value;
-            const product = document.getElementById('filterProduct').value;
-            const store = document.getElementById('filterStore').value;
+            const subCategory = document.getElementById('filterSubCategory').value;
+            const thirdCategory = document.getElementById('filterThirdCategory').value;
             const color = document.getElementById('filterColor').value;
-            const country = document.getElementById('filterCountry').value;
             const size = document.getElementById('filterSize').value;
+            const country = document.getElementById('filterCountry').value;
+            const store = document.getElementById('filterStore').value;
 
             let filtered = rawData.filter(row => {
                 if(year !== "全部" && row.年份 != year) return false;
                 if(month !== "全部" && row.月份 != month) return false;
-                if(category !== "全部" && row.分类 !== category) return false;
-                if(product !== "全部" && row.品名 !== product) return false;
-                if(store !== "全部" && row.店铺 !== store) return false;
+                if(category !== "全部" && row.一级分类 !== category) return false;
+                if(subCategory !== "全部" && row.二级分类 !== subCategory) return false;
+                if(thirdCategory !== "全部" && row.三级分类 !== thirdCategory) return false;
                 if(color !== "全部" && row.颜色 !== color) return false;
-                if(country !== "全部" && row.国家 !== country) return false;
                 if(size !== "全部" && row.尺码 !== size) return false;
+                if(country !== "全部" && row.国家 !== country) return false;
+                if(store !== "全部" && row.店铺 !== store) return false;
                 return true;
             });
             renderAllCharts(filtered);
             renderRemarkList(filtered);
         }
 
+        // 明细页面应用筛选（增加国家、店铺判断）
+        function applyDetailFilters() {
+            if(!rawData.length) return;
+            const year = document.getElementById('detailFilterYear').value;
+            const month = document.getElementById('detailFilterMonth').value;
+            const category = document.getElementById('detailFilterCategory').value;
+            const subCategory = document.getElementById('detailFilterSubCategory').value;
+            const thirdCategory = document.getElementById('detailFilterThirdCategory').value;
+            const color = document.getElementById('detailFilterColor').value;
+            const size = document.getElementById('detailFilterSize').value;
+            const country = document.getElementById('detailFilterCountry').value;
+            const store = document.getElementById('detailFilterStore').value;
+
+            let filtered = rawData.filter(row => {
+                if(year !== "全部" && row.年份 != year) return false;
+                if(month !== "全部" && row.月份 != month) return false;
+                if(category !== "全部" && row.一级分类 !== category) return false;
+                if(subCategory !== "全部" && row.二级分类 !== subCategory) return false;
+                if(thirdCategory !== "全部" && row.三级分类 !== thirdCategory) return false;
+                if(color !== "全部" && row.颜色 !== color) return false;
+                if(size !== "全部" && row.尺码 !== size) return false;
+                if(country !== "全部" && row.国家 !== country) return false;
+                if(store !== "全部" && row.店铺 !== store) return false;
+                return true;
+            });
+            renderReasonDetailList(filtered);
+        }
+
+        // 重置筛选（新增国家、店铺下拉重置）
         function resetFilters() {
             document.getElementById('filterYear').value = "全部";
             document.getElementById('filterMonth').value = "全部";
             document.getElementById('filterCategory').value = "全部";
-            document.getElementById('filterProduct').value = "全部";
-            document.getElementById('filterStore').value = "全部";
+            document.getElementById('filterSubCategory').value = "全部";
+            document.getElementById('filterThirdCategory').value = "全部";
             document.getElementById('filterColor').value = "全部";
-            document.getElementById('filterCountry').value = "全部";
             document.getElementById('filterSize').value = "全部";
+            document.getElementById('filterCountry').value = "全部";
+            document.getElementById('filterStore').value = "全部";
             applyFilters();
         }
 
-        // 渲染所有图表（完全适配你的Excel字段）
+        // 明细页重置筛选（新增国家、店铺下拉重置）
+        function resetDetailFilters() {
+            document.getElementById('detailFilterYear').value = "全部";
+            document.getElementById('detailFilterMonth').value = "全部";
+            document.getElementById('detailFilterCategory').value = "全部";
+            document.getElementById('detailFilterSubCategory').value = "全部";
+            document.getElementById('detailFilterThirdCategory').value = "全部";
+            document.getElementById('detailFilterColor').value = "全部";
+            document.getElementById('detailFilterSize').value = "全部";
+            document.getElementById('detailFilterCountry').value = "全部";
+            document.getElementById('detailFilterStore').value = "全部";
+            applyDetailFilters();
+        }
+
+        // 渲染所有图表 —— 【恢复 店铺、国家 原有逻辑】
         function renderAllCharts(data) {
             let totalSale = 0, totalReturn = 0;
-            let monthReturn = {}, sizeSale = {}, reasonReturn = {}, colorReturn = {}, storeSale = {}, countrySale = {};
+            let monthReturn = {}, sizeSale = {}, reasonReturn = {}, colorReturn = {};
+            // 恢复原有店铺、国家统计变量
+            let storeSale = {}, countrySale = {}, countryReturn = {};
             let styleSet = new Set();
 
             data.forEach(row => {
@@ -267,7 +478,7 @@
                 let ret = Number(row.退货数量) || 0;
                 totalSale += sale;
                 totalReturn += ret;
-                // 月度退货趋势
+                // 退货率趋势
                 let mth = `${row.年份}-${row.月份}月`;
                 monthReturn[mth] = (monthReturn[mth] || 0) + ret;
                 // 尺码销量
@@ -279,12 +490,13 @@
                 // 颜色退货
                 let col = row.颜色 || "未知";
                 colorReturn[col] = (colorReturn[col] || 0) + ret;
-                // 店铺销量
-                let store = row.店铺 || "未知";
+                // ========== 恢复：店铺销量统计 ==========
+                let store = row.店铺 || "未知店铺";
                 storeSale[store] = (storeSale[store] || 0) + sale;
-                // 国家销量
-                let country = row.国家 || "未知";
+                // ========== 恢复：国家销量 & 退货量统计 ==========
+                let country = row.国家 || "未知国家";
                 countrySale[country] = (countrySale[country] || 0) + sale;
+                countryReturn[country] = (countryReturn[country] || 0) + ret;
                 // 款式总数
                 if(row.品名) styleSet.add(row.品名);
             });
@@ -296,57 +508,199 @@
             document.getElementById('returnRateVal').innerText = rateVal + "%";
             document.getElementById('totalStyleVal').innerText = styleSet.size;
 
-            // 1. 月度退货趋势折线图
+            // 1. 退货率趋势柱形图（带百分比标签）
             chartTrend.setOption({
-                backgroundColor:'transparent',
-                tooltip:{trigger:'axis'},
-                // 👇 新增这一段，让图表整体下移
+                backgroundColor: 'transparent',
+                tooltip: { trigger: 'axis' },
                 grid: {
                     top: '15%',
-                    bottom: '1%',  // 这个值越小，图表越往下
+                    bottom: '10%',
                     left: '10%',
                     right: '10%',
                     containLabel: true
                 },
-                xAxis:{ type:'category', data:Object.keys(monthReturn), axisLabel:{color:'#BDC7D2'} },
-                yAxis:{ type:'value', name:'退货数量(件)', axisLabel:{color:'#B0BDC8'}, splitLine:{lineStyle:{color:'#203E54'}} },
-                series:[{ type:'line', data:Object.values(monthReturn), smooth:true, lineStyle:{width:3, color:'#65C9D7'}, areaStyle:{opacity:0.2, color:'#3CACBD'} }]
-            });
-
-            // 2. 尺码销量横向柱状图
-            chartSize.setOption({
-                tooltip:{},
-                grid:{
-                    containLabel:true,
-                    top: '15%',    // 顶部留空
-                    bottom: '10%'  // 往下移动
+                xAxis: { 
+                    type: 'category', 
+                    data: (() => {
+                        const months = [...new Set(data.map(row => `${row.年份}-${row.月份}月`))];
+                        months.sort((a, b) => {
+                            const [yearA, monthA] = a.split('-').map(Number);
+                            const [yearB, monthB] = b.split('-').map(Number);
+                            return (yearA - yearB) || (monthA - monthB);
+                        });
+                        return months;
+                    })(), 
+                    axisLabel: { color: '#BDC7D2' } 
                 },
-                xAxis:{ type:'value', name:'销量', axisLabel:{color:'#BDC7D2'} },
-                yAxis:{ type:'category', data:Object.keys(sizeSale), axisLabel:{color:'#E4D6B2'} },
-                series:[{ type:'bar', data:Object.values(sizeSale), itemStyle:{color:'#73B1C2', borderRadius:[0,8,8,0]} }]
+                yAxis: { 
+                    type: 'value', 
+                    name: '退货率(%)',
+                    max: 100,
+                    axisLabel: { color: '#B0BDC8', formatter: '{value} %' }, 
+                    splitLine: { lineStyle: { color: '#203E54' } }
+                },
+                series: [{ 
+                    type: 'bar', // 改成柱形图
+                    barWidth: '50%',
+                    data: (() => {
+                        // 按 年份-月份 分组统计销售和退货数量
+                        const stats = {};
+                        data.forEach(row => {
+                            const key = `${row.年份}-${row.月份}月`;
+                            const sale = Number(row.销售数量) || 0;
+                            const ret = Number(row.退货数量) || 0;
+                            if (!stats[key]) {
+                                stats[key] = { sale: 0, ret: 0 };
+                            }
+                            stats[key].sale += sale;
+                            stats[key].ret += ret;
+                        });
+
+                        // 按月份升序排序，和x轴保持一致
+                        const sortedKeys = Object.keys(stats).sort((a, b) => {
+                            const [yearA, monthA] = a.split('-').map(Number);
+                            const [yearB, monthB] = b.split('-').map(Number);
+                            return (yearA - yearB) || (monthA - monthB);
+                        });
+
+                        // 计算每个月的退货率，并限制最大100%
+                        return sortedKeys.map(key => {
+                            const { sale, ret } = stats[key];
+                            let rate = sale > 0 ? ((ret / sale) * 100).toFixed(1) : 0;
+                            rate = Math.min(Number(rate), 100);
+                            return rate;
+                        });
+                    })(),
+                    itemStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: '#65C9D7' },
+                            { offset: 1, color: '#3CACBD' }
+                        ]),
+                        borderRadius: [4, 4, 0, 0]
+                    },
+                    label: {
+                        show: true,
+                        position: 'top',
+                        color: '#F0E6CF',
+                        fontSize: 10,
+                        formatter: '{c} %'
+                    }
+                }]
             });
 
-            // 3. 退货原因环形饼图（图例贴左下角，饼图上移）
+            // 2. 不同尺码占比（水平条形图，仅前10个）
+            chartSize.setOption({
+                backgroundColor: 'transparent',
+                grid: {
+                    left: '20%',
+                    right: '10%',
+                    top: '5%',
+                    bottom: '5%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'value',
+                    name: '销量占比',
+                    nameTextStyle: { color: '#B0BDC8', fontSize: 10 },
+                    axisLabel: { color: '#B0BDC8', fontSize: 10 },
+                    splitLine: { lineStyle: { color: '#203E54' } }
+                },
+                yAxis: {
+                    type: 'category',
+                    // 按销量降序，只取前10个
+                    data: Object.keys(sizeSale)
+                        .sort((a, b) => sizeSale[b] - sizeSale[a])
+                        .slice(0, 10),
+                    axisLabel: { color: '#E4D5AF', fontSize: 10 }
+                },
+                series: [{
+                    type: 'bar',
+                    barWidth: '60%',
+                    data: Object.keys(sizeSale)
+                        .sort((a, b) => sizeSale[b] - sizeSale[a])
+                        .slice(0, 10)
+                        .map(k => sizeSale[k]),
+                    itemStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+                            { offset: 0, color: '#6DA5B7' },
+                            { offset: 1, color: '#8BC0D6' }
+                        ]),
+                        borderRadius: [0, 4, 4, 0]
+                    },
+                    label: {
+                        show: true,
+                        position: 'right',
+                        color: '#F0E6CF',
+                        fontSize: 9,
+                        formatter: function(params) {
+                            const total = Object.values(sizeSale).reduce((sum, val) => sum + val, 0);
+                            const rate = total > 0 ? ((params.value / total) * 100).toFixed(1) : 0;
+                            return `${rate}%`;
+                        }
+                    }
+                }]
+            });
+
+            // 3. 退货原因环形饼图（修复版：支持所有格式的原因名称）
             chartReason.setOption({
                 backgroundColor: 'transparent',
-                tooltip: { trigger: 'item' },
+                tooltip: { 
+                    trigger: 'item',
+                    formatter: function(params) {
+                        return `${params.name}<br/>占比: ${params.percent}%`;
+                    }
+                },
                 legend: {
                     orient: 'vertical',
-                    bottom: 0,          // 图例贴底
-                    left: 10,           // 图例靠左，距离左侧10px
+                    bottom: 0,
+                    left: 10,
                     textStyle: {
                         color: '#E4D5AF',
-                        fontSize: 10   // 图例字体缩小一点，避免超出
+                        fontSize: 10
                     },
-                    itemWidth: 16,      // 图例方块缩小，省空间
+                    itemWidth: 14,
                     itemHeight: 12,
-                    itemGap: 6          // 图例之间的间距调小一点
+                    itemGap: 6
                 },
                 series: [{
                     type: 'pie',
-                    radius: ['45%', '70%'],
-                    center: ['55%', '35%'], // 饼图整体往右+往上挪，彻底避开左下角
-                    data: Object.keys(reasonReturn).map(k => ({ name: k, value: reasonReturn[k] })),
+                    radius: ['41%', '70%'],
+                    center: ['55%', '35%'],
+                    data: (() => {
+                        const originData = Object.keys(reasonReturn).map(k => {
+                            const match = k.match(/\((.+)\)/);
+                            const displayName = match ? match[1] : k;
+                            return { 
+                                name: displayName, 
+                                value: reasonReturn[k] 
+                            };
+                        });
+                        const total = originData.reduce((sum, item) => sum + item.value, 0);
+
+                        const validData = [];
+                        let otherValue = 0;
+
+                        originData.forEach(item => {
+                            if (total === 0) return;
+                            const percent = (item.value / total) * 100;
+                            if (percent >= 3) {
+                                validData.push(item);
+                            } else {
+                                // 低于3%的全部汇总到「其他」
+                                otherValue += item.value;
+                            }
+                        });
+
+                        // 如果有低于5%的数据，就加上「其他」这一项
+                        if (otherValue > 0) {
+                            validData.push({
+                                name: '其他',
+                                value: otherValue
+                            });
+                        }
+
+                        return validData;
+                    })(),
                     label: {
                         color: '#F0E6CF',
                         formatter: '{d}%',
@@ -359,72 +713,314 @@
                     }
                 }]
             });
-            // 4. 颜色退货分布饼图
+
+            // 4. 颜色退货分布 水平条形图（替代饼图）
             chartColor.setOption({
-                legend:{ orient:'vertical', right:'right', textStyle:{color:'#E4D5AF'} },
-                series:[{ 
-                    type:'pie', 
-                    radius:'55%', 
-                    center: ['42%', '55%'],  // 往左42+往下移动55
-                    data:Object.keys(colorReturn).map(k=>({name:k,value:colorReturn[k]})), 
-                    label:{color:'#F5E9C8',formatter:'{d}%',fontSize:10}, 
-                    labelLine:{lineStyle:{color:'#E4D5AF'}} 
+                backgroundColor: 'transparent',
+                grid: {
+                    left: '18%',
+                    right: '10%',
+                    top: '5%',
+                    bottom: '5%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'value',
+                    axisLabel: { color: '#B0BDC8' },
+                    splitLine: { lineStyle: { color: '#203E54' } }
+                },
+                yAxis: {
+                    type: 'category',
+                    // 按退货数量降序排序，只显示前15个（避免过长）
+                    data: Object.keys(colorReturn)
+                        .sort((a, b) => colorReturn[b] - colorReturn[a])
+                        .slice(0, 10),  //这里是10个数据显示
+                    axisLabel: { color: '#E4D5AF', fontSize: 10 }
+                },
+                series: [{
+                    type: 'bar',
+                    data: Object.keys(colorReturn)
+                        .sort((a, b) => colorReturn[b] - colorReturn[a])
+                        .slice(0, 10) //这里是10个数据显示
+                        .map(k => colorReturn[k]),
+                    itemStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+                            { offset: 0, color: '#C6A862' },
+                            { offset: 1, color: '#E8C87A' }
+                        ]),
+                        borderRadius: [0, 4, 4, 0]
+                    },
+                    label: {
+                        show: true,
+                        position: 'right',
+                        color: '#F0E6CF',
+                        fontSize: 9
+                    }
                 }]
             });
 
-            // 5. 店铺销量柱状图（往下对齐优化）
+            // 5. 各店铺销量对比（过滤低占比版：仅显示 ≥2% 的店铺）
             chartStore.setOption({
+                backgroundColor: 'transparent',
                 grid: { 
-                    top: 12,    // 保持顶部间距
-                    bottom: 1,  // 往下对齐，核心修改
-                    containLabel:true
+                    top: 12,
+                    bottom: 40,
+                    left: 10,
+                    right: 10,
+                    containLabel: true
                 },
-                xAxis:{ type:'category', data:Object.keys(storeSale), axisLabel:{rotate:20, color:'#C2CCD8'} },
-                yAxis:{ type:'value', name:'销量(件)' },
-                series:[{ type:'bar', data:Object.values(storeSale), itemStyle:{color:'#B99E5E', borderRadius:[6,6,0,0]} }]
+                xAxis:{ 
+                    type:'category', 
+                    data: (() => {
+                        const total = Object.values(storeSale).reduce((sum, val) => sum + val, 0);
+                        const mainList = [];
+                        let otherFlag = false;
+
+                        Object.keys(storeSale).forEach(k => {
+                            const rate = total > 0 ? ((storeSale[k] / total) * 100) : 0;
+                            if (rate >= 2) {
+                                mainList.push(k);
+                            } else {
+                                otherFlag = true;
+                            }
+                        });
+                        // 存在低于2%的数据，追加「其他店铺」
+                        if (otherFlag) {
+                            mainList.push("其他店铺");
+                        }
+                        return mainList;
+                    })(),
+                    axisLabel:{
+                        rotate: 30,
+                        color:'#C2CCD8',
+                        fontSize: 10
+                    } 
+                },
+                yAxis:{ 
+                    type:'value', 
+                    name:'销量(件)',
+                    axisLabel: { color: '#B0BDC8' },
+                    splitLine: { lineStyle: { color: '#203E54' } }
+                },
+                series:[{ 
+                    type:'bar', 
+                    barWidth: '50%',
+                    data: (() => {
+                        const total = Object.values(storeSale).reduce((sum, val) => sum + val, 0);
+                        const mainData = [];
+                        let otherSum = 0;
+
+                        Object.keys(storeSale).forEach(k => {
+                            const rate = total > 0 ? ((storeSale[k] / total) * 100) : 0;
+                            if (rate >= 2) {
+                                mainData.push(storeSale[k]);
+                            } else {
+                                // 低于2% 累加进其他店铺
+                                otherSum += storeSale[k];
+                            }
+                        });
+                        // 有汇总数据则追加
+                        if (otherSum > 0) {
+                            mainData.push(otherSum);
+                        }
+                        return mainData;
+                    })(),
+                    itemStyle:{
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: '#B99E5E' },
+                            { offset: 1, color: '#D4B97A' }
+                        ]),
+                        borderRadius:[6,6,0,0]
+                    },
+                    label: {
+                        show: true,
+                        position: 'top',
+                        color: '#F0E6CF',
+                        fontSize: 9,
+                        formatter: function(params) {
+                            const total = Object.values(storeSale).reduce((sum, val) => sum + val, 0);
+                            const rate = total > 0 ? ((params.value / total) * 100).toFixed(1) : 0;
+                            return `${rate}%`;
+                        }
+                    }
+                }]
             });
 
-            // 6. 海外各国销量条形图
+            // 6. 各国家退货率条形图（修复标签遮挡版）
             chartCountry.setOption({
-                grid:{bottom: 40, containLabel:true },
-                xAxis:{ type:'value' },
-                yAxis:{ type:'category', data:Object.keys(countrySale), axisLabel:{color:'#E1D1A5'} },
-                series:[{ type:'bar', data:Object.values(countrySale), itemStyle:{color:'#6DA5B7'} }]
+                backgroundColor: 'transparent',
+                grid: {
+                    left: '15%',
+                    right: '18%', // 给右侧标签留足空间
+                    top: '5%',
+                    bottom: '10%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'value',
+                    name: '退货率(%)',
+                    max: 100,
+                    axisLabel: { color: '#B0BDC8' },
+                    splitLine: { lineStyle: { color: '#203E54' } }
+                },
+                yAxis: {
+                    type: 'category',
+                    data: Object.keys(countrySale),
+                    axisLabel: { color: '#E1D1A5', fontSize: 11 }
+                },
+                series: [{
+                    type: 'bar',
+                    barWidth: '60%',
+                    data: Object.keys(countrySale).map(c => {
+                        let sale = countrySale[c] || 0;
+                        let ret = countryReturn[c] || 0;
+                        let rate = sale > 0 ? ((ret / sale) * 100).toFixed(1) : 0;
+                        return Number(rate);
+                    }),
+                    itemStyle: { color: '#6DA5B7' },
+                    label: {
+                        show: true,
+                        position: 'right',
+                        color: '#E1D1A5',
+                        fontSize: 11,
+                        formatter: '{c} %'
+                    }
+                }]
             });
         }
 
-        // 渲染退货备注列表（完全适配你的Excel字段）
+        // 渲染退货备注出现次数最多的前5条（适配新字段）
         function renderRemarkList(data) {
             let tbody = document.getElementById('remarkTbody');
             if(!tbody) return;
-            let limited = data.slice(0,5);
-            if(limited.length === 0){
-                tbody.innerHTML = '<tr><td colspan="8">暂无退货备注数据</td></tr>';
+
+            const validData = data.filter(row => {
+                const remark = row.退货备注?.trim() || "";
+                return remark !== "" && remark !== "无";
+            });
+
+            if (validData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10">暂无有效备注数据</td></tr>';
                 return;
             }
+
+            const remarkCount = {};
+            validData.forEach(row => {
+                const remark = row.退货备注.trim();
+                remarkCount[remark] = (remarkCount[remark] || 0) + 1;
+            });
+
+            let list = validData.map(row => {
+                const remark = row.退货备注.trim();
+                return {
+                    ...row,
+                    count: remarkCount[remark]
+                };
+            });
+            list.sort((a, b) => b.count - a.count);
+
+            const result = [];
+            const addedRemark = new Set();
+            for (const item of list) {
+                const remark = item.退货备注.trim();
+                if (!addedRemark.has(remark)) {
+                    addedRemark.add(remark);
+                    result.push(item);
+                    if (result.length >= 5) break;
+                }
+            }
+
             let html = "";
-            limited.forEach(row => {
+            result.forEach(row => {
+                const curRemark = row.退货备注.trim();
                 html += `<tr>
                     <td>${row.年份 || '-'}</td>
                     <td>${row.月份 || '-'}</td>
                     <td>${row.品名 || '-'}</td>
-                    <td>${row.店铺 || '-'}</td>
+                    <td>${row.一级分类 || '-'}</td>
+                    <td>${row.二级分类 || '-'}</td>
+                    <td>${row.三级分类 || '-'}</td>
                     <td>${row.颜色 || '-'}</td>
                     <td>${row.尺码 || '-'}</td>
                     <td>${row.退货原因 || '-'}</td>
-                    <td>${row.退货备注 || '无'}</td>
+                    <td>${curRemark}（出现 ${row.count} 次）</td>
                 </tr>`;
             });
             tbody.innerHTML = html;
         }
 
+        // 渲染退货原因明细列表（新增【退货原因】列）
+        function renderReasonDetailList(data) {
+            let tbody = document.getElementById('reasonDetailTbody');
+            let totalInfoDom = document.getElementById('detailTotalInfo');
+            if(!tbody || !totalInfoDom) return;
+
+            const validData = data.filter(row => {
+                const remark = row.退货备注?.trim() || "";
+                return remark !== "" && remark !== "无";
+            });
+
+            const totalNum = data.length;
+            const sizeStat = {};
+            data.forEach(row => {
+                const s = row.尺码 || "未知尺码";
+                sizeStat[s] = (sizeStat[s] || 0) + 1;
+            });
+            let sizeText = "";
+            for(let s in sizeStat){
+                sizeText += `${s}:${sizeStat[s]}条 `;
+            }
+            if(!sizeText) sizeText = "暂无数据";
+            totalInfoDom.innerHTML = `<span>数据总条数：${totalNum}</span><span>尺码分布：${sizeText}</span>`;
+
+            if (validData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4">暂无有效备注数据</td></tr>';
+                return;
+            }
+
+            const groupCount = {};
+            validData.forEach(row => {
+                const size = row.尺码 || "未知";
+                const reason = row.退货原因 || "未知原因";
+                const remark = row.退货备注.trim();
+                const key = `${size}|${reason}|${remark}`;
+                groupCount[key] = (groupCount[key] || 0) + 1;
+            });
+
+            const sortedList = Object.entries(groupCount)
+                .sort((a, b) => b[1] - a[1])
+                .map(([key, count]) => {
+                    const [size, reason, remark] = key.split('|');
+                    return { size, reason, remark, count };
+                });
+
+            let html = "";
+            sortedList.forEach(item => {
+                const translatedRemark = translateRemark(item.remark);
+                html += `<tr>
+                    <td>${item.size}</td>
+                    <td>${item.reason}</td>
+                    <td>${translatedRemark}</td>
+                    <td>${item.count}</td>
+                </tr>`;
+            });
+            tbody.innerHTML = html;
+        }
+
+        // 菜单切换逻辑
         function switchPage(pageId) {
             document.querySelectorAll('.menu-item').forEach(item => item.classList.remove('active'));
             event.target.classList.add('active');
             document.querySelectorAll('.content-area > div').forEach(page => page.style.display = 'none');
-            if(pageId === 'saleReturn') document.getElementById('saleReturnPage').style.display = 'block';
-            if(pageId === 'saleReturn' && chartTrend) {
-                [chartTrend, chartSize, chartReason, chartColor, chartStore, chartCountry].forEach(ch => ch && ch.resize());
+            
+            if(pageId === 'saleReturn') {
+                document.getElementById('saleReturnPage').style.display = 'block';
+                if(chartTrend) {
+                    [chartTrend, chartSize, chartReason, chartColor, chartStore, chartCountry].forEach(ch => ch && ch.resize());
+                }
+            } else if(pageId === 'reasonDetail') {
+                document.getElementById('reasonDetailPage').style.display = 'block';
+                applyDetailFilters();
             }
         }
     </script>
