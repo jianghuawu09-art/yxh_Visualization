@@ -3,10 +3,11 @@ from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
 import os
 from datetime import datetime
+import numpy as np
 
 app = FastAPI()
 
-# 跨域配置（前端能正常访问）
+# 跨域配置
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -15,27 +16,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 你的Excel文件路径
 EXCEL_FILE = "data.xlsx"
 
 def get_data():
     try:
-        # 1. 检查文件是否存在
         if not os.path.exists(EXCEL_FILE):
             print(f"❌ 文件不存在: {os.path.abspath(EXCEL_FILE)}")
             return []
         
-        # 2. 实时读取Excel（每次请求都重新读取，保证数据最新）
+        # 读取Excel
         df = pd.read_excel(EXCEL_FILE, engine="openpyxl")
-        
+        # 统一清理列名首尾空格
+        df.columns = [col.strip() for col in df.columns]
+
         print(f"✅ 读取成功，共 {len(df)} 条数据")
         print(f"📋 列名：{list(df.columns)}")
 
-        # 3. 空值处理（防止前端报错）
-        df = df.fillna({
+        # ========== 修复1：和你Excel真实列名对齐填充空值 ==========
+        fill_rule = {
             "年份": 0,
             "月份": 0,
-            "分类": "未知分类",
+            "一级分类": "未知分类",
+            "二级分类": "未知分类",
+            "三级分类": "未知分类",
             "品名": "未知品名",
             "店铺": "未知店铺",
             "颜色": "未知颜色",
@@ -45,15 +48,21 @@ def get_data():
             "退货数量": 0,
             "退货原因": "未知原因",
             "退货备注": "无"
-        })
+        }
+        df = df.fillna(fill_rule)
 
-        # 4. 强制数据类型转换（防止数字和字符串混合）
-        df["年份"] = df["年份"].astype(int)
-        df["月份"] = df["月份"].astype(int)
-        df["销售数量"] = df["销售数量"].astype(int)
-        df["退货数量"] = df["退货数量"].astype(int)
+        # ========== 修复2：安全转数字，非法内容强制置0 ==========
+        num_cols = ["年份", "月份", "销售数量", "退货数量"]
+        for col in num_cols:
+            # 转为数值，失败变为NaN，再填充0，最后转整型
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
 
-        # 5. 转换为前端可识别的格式
+        # 文本列统一去除首尾空格
+        text_cols = df.select_dtypes(include=["object"]).columns
+        for col in text_cols:
+            df[col] = df[col].astype(str).str.strip()
+
+        # 转为字典列表返回
         result = df.to_dict(orient="records")
         return result
 
@@ -66,7 +75,7 @@ def get_data():
 def read_data():
     return get_data()
 
-# 健康检查接口（调试用）
+# 健康检查接口
 @app.get("/api/health")
 def health_check():
     if os.path.exists(EXCEL_FILE):
