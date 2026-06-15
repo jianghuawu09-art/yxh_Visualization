@@ -207,6 +207,17 @@
     </div>
 
     <script>
+        // 新增：自动刷新后端缓存,本地缓存：http://127.0.0.1:8000/api/refresh
+        async function refreshBackendCache() {
+            try {
+                // 本地地址，cpolar使用时替换成你的公网域名
+                await axios.get("https://3b232d86.r18.cpolar.top/api/refresh");
+                console.log("✅ 后端缓存已刷新，读取最新Excel");
+            } catch (err) {
+                console.warn("自动刷新缓存失败，直接加载旧数据", err);
+            }
+        }
+        
         let chartTrend, chartSize, chartReason, chartColor, chartStore, chartCountry;
         let rawData = [];
 
@@ -215,8 +226,8 @@
             { user: "admin", pwd: "123456" },
             { user: "wujianghua", pwd: "wjh123" }
         ];
-
-        function login() {
+        // async是异步
+        async function login() {
             let user = document.getElementById("username").value;
             let pwd = document.getElementById("password").value;
             let check = USER_LIST.some(item => item.user === user && item.pwd === pwd);
@@ -226,6 +237,8 @@
                 document.getElementById("loginBox").style.display = "none";
                 document.getElementById("mainPage").style.display = "flex";
                 initDashboard();
+                // 新增：先刷新后端缓存，再加载数据
+                await refreshBackendCache();
                 loadDataFromBackend();
                 window.addEventListener('resize', () => {
                     [chartTrend, chartSize, chartReason, chartColor, chartStore, chartCountry].forEach(ch => ch && ch.resize());
@@ -245,17 +258,37 @@
         }
 
         // 从后端实时读取数据  本地：http://127.0.0.1:8000/api/data
+
+        // 自动循环分页拉取所有数据
         async function loadDataFromBackend() {
+            rawData = []; // 清空旧数据
+            let page = 1;
+            const pageSize = 1000; // 单次请求1000条，体积小，cpolar稳定不截断
+            let total = 0;
+
             try {
-                const res = await axios.get("http://3b232d86.r18.cpolar.top/api/data");
-                rawData = res.data || [];
-                console.log("读取到的数据：", rawData);
-                initFilterOptions(); 
-                initDetailFilterOptions(); 
-                applyFilters(); 
+                while (true) {
+                    // 分页请求
+                    const res = await axios.get(`https://3b232d86.r18.cpolar.top/api/data?page=${page}&size=${pageSize}`);
+                    const pageData = res.data.data || [];
+                    total = res.data.total;
+
+                    if (pageData.length === 0) break; // 无数据停止循环
+                    rawData = rawData.concat(pageData); // 拼接当前页到总数据
+                    console.log(`已加载第${page}页，累计${rawData.length}/${total}条`);
+                    
+                    // 全部加载完成退出循环
+                    if (rawData.length >= total) break;
+                    page++;
+                }
+
+                console.log("✅ 全部数据加载完成，总条数：", rawData.length);
+                initFilterOptions();
+                initDetailFilterOptions();
+                applyFilters();
             } catch (error) {
-                console.error("后端数据读取失败：", error);
-                alert("数据加载失败，请检查后端是否正常运行");
+                console.error("数据加载失败：", error);
+                alert("数据加载失败，请检查后端或cpolar隧道是否正常");
             }
         }
 
@@ -989,12 +1022,14 @@
         }
 
         // 页面加载自动检测登录状态.这里是为了给
-        window.onload = function() {
+        window.onload = async function() {
             const isLogin = localStorage.getItem("isLogin") === "1";
             if (isLogin) {
                 document.getElementById("loginBox").style.display = "none";
                 document.getElementById("mainPage").style.display = "flex";
                 initDashboard();
+                // 页面刷新自动清空后端缓存，读取最新Excel
+                await refreshBackendCache();
                 loadDataFromBackend();
                 window.addEventListener('resize', () => {
                     [chartTrend, chartSize, chartReason, chartColor, chartStore, chartCountry].forEach(ch => ch && ch.resize());
