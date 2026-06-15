@@ -26,13 +26,13 @@ def get_data():
         
         # 读取Excel
         df = pd.read_excel(EXCEL_FILE, engine="openpyxl")
-        # 统一清理列名首尾空格
+        # 统一清理列名首尾空格（关键：避免列名带空格导致匹配失败）
         df.columns = [col.strip() for col in df.columns]
 
         print(f"✅ 读取成功，共 {len(df)} 条数据")
         print(f"📋 列名：{list(df.columns)}")
 
-        # ========== 修复1：和你Excel真实列名对齐填充空值 ==========
+        # ========== 修复1：和你Excel真实列名对齐，兜底填充空值 ==========
         fill_rule = {
             "年份": 0,
             "月份": 0,
@@ -49,21 +49,30 @@ def get_data():
             "退货原因": "未知原因",
             "退货备注": "无"
         }
-        df = df.fillna(fill_rule)
+
+        # 对所有列按规则填充空值
+        for col, default_val in fill_rule.items():
+            if col in df.columns:
+                df[col] = df[col].fillna(default_val)
+            else:
+                print(f"⚠️  警告：Excel中不存在列 [{col}]，已跳过填充")
 
         # ========== 修复2：安全转数字，非法内容强制置0 ==========
         num_cols = ["年份", "月份", "销售数量", "退货数量"]
         for col in num_cols:
-            # 转为数值，失败变为NaN，再填充0，最后转整型
-            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
+            if col in df.columns:
+                # 转为数值，失败变为NaN，再填充0，最后转整型
+                df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
 
-        # 文本列统一去除首尾空格
-        text_cols = df.select_dtypes(include=["object"]).columns
+        # 文本列统一去除首尾空格，避免前后端空格不匹配
+        text_cols = ["一级分类", "二级分类", "三级分类", "品名", "店铺", "颜色", "国家", "尺码", "退货原因", "退货备注"]
         for col in text_cols:
-            df[col] = df[col].astype(str).str.strip()
+            if col in df.columns:
+                df[col] = df[col].astype(str).str.strip()
 
         # 转为字典列表返回
         result = df.to_dict(orient="records")
+        print(f"✅ 数据处理完成，返回 {len(result)} 条有效数据")
         return result
 
     except Exception as e:

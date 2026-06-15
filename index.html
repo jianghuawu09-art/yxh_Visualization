@@ -66,49 +66,7 @@
             display: flex;
             gap: 30px;
         }
-        /* IP拦截提示样式 */
-        .ip-block {
-            width:100vw;height:100vh;display:flex;align-items:center;justify-content:center;
-            background:#02090f;color:#f44336;font-size:24px;
-        }
     </style>
-        <!-- ========== IP白名单配置 开始 ========== -->
-    <script>
-        // 1. 在这里配置允许访问的IP白名单（替换成你实际的内网/公网IP）
-        const IP_WHITE_LIST = [
-            "127.0.0.1",        // 本机
-            "192.168.1.100",    // 示例内网IP1
-            "192.168.1.101"     // 示例内网IP2
-        ];
-
-        // 2. 校验IP函数
-        async function checkIPAccess() {
-            try {
-                // 调用公共接口获取客户端公网IP
-                const res = await fetch("https://api.ipify.org?format=json");
-                const data = await res.json();
-                const clientIP = data.ip;
-
-                // 判断是否在白名单内
-                if (!IP_WHITE_LIST.includes(clientIP)) {
-                    // IP不在白名单，拦截页面
-                    document.body.innerHTML = `<div class="ip-block">拒绝访问：当前设备IP【${clientIP}】不在访问白名单中</div>`;
-                    return false;
-                }
-                return true;
-            } catch (e) {
-                // 接口异常（断网/内网无外网），默认放行（内网场景常用）
-                console.log("IP获取失败，默认放行");
-                return true;
-            }
-        }
-
-        // 页面加载立即执行IP校验
-        window.onload = async function() {
-            await checkIPAccess();
-        }
-    </script>
-    <!-- ========== IP白名单配置 结束 ========== -->
 </head>
 <body>
     <!-- 登录界面 -->
@@ -139,6 +97,7 @@
             <!-- 原有销售退货页面 -->
             <div id="saleReturnPage">
                 <div class="dashboard-title">服饰销售退货数据可视化大屏</div>
+                <span style="display: block; text-align: center; font-size: 14px; color: #C8D1DC; font-weight: normal;">（数据太大，点击刷新后大概要等待1分钟数据才会自动刷新出来，请耐心等待）</span>
                 
                 <!-- 指标卡片区 -->
                 <div class="kpi-grid">
@@ -254,7 +213,8 @@
         // 登录配置
         const USER_LIST = [
             { user: "admin", pwd: "123456" },
-            { user: "wujianghua", pwd: "wjh123" }
+            { user: "Test", pwd: "123456" },
+            { user: "zhangxiaohui", pwd: "123456" },
         ];
 
         function login() {
@@ -262,6 +222,8 @@
             let pwd = document.getElementById("password").value;
             let check = USER_LIST.some(item => item.user === user && item.pwd === pwd);
             if(check){
+                // 登录成功：标记已登录到 localStorage
+                localStorage.setItem("isLogin", "1");
                 document.getElementById("loginBox").style.display = "none";
                 document.getElementById("mainPage").style.display = "flex";
                 initDashboard();
@@ -283,10 +245,10 @@
             chartCountry = echarts.init(document.getElementById('countryBar'));
         }
 
-        // 从后端实时读取数据,本地修改：axios.get("http://127.0.0.1:8000/api/data");
+        // 从后端实时读取数据，本地：http://127.0.0.1:8000/api/data
         async function loadDataFromBackend() {
             try {
-                const res = await axios.get("https://187f71ec.r21.vip.cpolar.cn/api/data");
+                const res = await axios.get("https://7e304329.r21.vip.cpolar.cn/api/data");
                 rawData = res.data || [];
                 console.log("读取到的数据：", rawData);
                 initFilterOptions(); 
@@ -508,19 +470,29 @@
             document.getElementById('returnRateVal').innerText = rateVal + "%";
             document.getElementById('totalStyleVal').innerText = styleSet.size;
 
-            // 1. 退货率趋势柱形图（带百分比标签）
+            // 退货率趋势 - 改为水平条形图
             chartTrend.setOption({
                 backgroundColor: 'transparent',
                 tooltip: { trigger: 'axis' },
                 grid: {
-                    top: '15%',
+                    top: '10%',
                     bottom: '10%',
-                    left: '10%',
-                    right: '10%',
+                    left: '20%', // 给左侧月份文字留足空间
+                    right: '15%', // 给右侧百分比标签留足空间
                     containLabel: true
                 },
-                xAxis: { 
-                    type: 'category', 
+                xAxis: {
+                    type: 'value',
+                    name: '退货率(%)',
+                    max: 100,
+                    axisLabel: { 
+                        color: '#B0BDC8', 
+                        formatter: '{value} %' 
+                    },
+                    splitLine: { lineStyle: { color: '#203E54' } }
+                },
+                yAxis: {
+                    type: 'category',
                     data: (() => {
                         const months = [...new Set(data.map(row => `${row.年份}-${row.月份}月`))];
                         months.sort((a, b) => {
@@ -529,21 +501,16 @@
                             return (yearA - yearB) || (monthA - monthB);
                         });
                         return months;
-                    })(), 
-                    axisLabel: { color: '#BDC7D2' } 
+                    })(),
+                    axisLabel: { 
+                        color: '#BDC7D2',
+                        fontSize: 10 // 月份文字字号
+                    }
                 },
-                yAxis: { 
-                    type: 'value', 
-                    name: '退货率(%)',
-                    max: 100,
-                    axisLabel: { color: '#B0BDC8', formatter: '{value} %' }, 
-                    splitLine: { lineStyle: { color: '#203E54' } }
-                },
-                series: [{ 
-                    type: 'bar', // 改成柱形图
-                    barWidth: '50%',
+                series: [{
+                    type: 'bar',
+                    barWidth: '60%',
                     data: (() => {
-                        // 按 年份-月份 分组统计销售和退货数量
                         const stats = {};
                         data.forEach(row => {
                             const key = `${row.年份}-${row.月份}月`;
@@ -556,14 +523,12 @@
                             stats[key].ret += ret;
                         });
 
-                        // 按月份升序排序，和x轴保持一致
                         const sortedKeys = Object.keys(stats).sort((a, b) => {
                             const [yearA, monthA] = a.split('-').map(Number);
                             const [yearB, monthB] = b.split('-').map(Number);
                             return (yearA - yearB) || (monthA - monthB);
                         });
 
-                        // 计算每个月的退货率，并限制最大100%
                         return sortedKeys.map(key => {
                             const { sale, ret } = stats[key];
                             let rate = sale > 0 ? ((ret / sale) * 100).toFixed(1) : 0;
@@ -572,15 +537,15 @@
                         });
                     })(),
                     itemStyle: {
-                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
                             { offset: 0, color: '#65C9D7' },
                             { offset: 1, color: '#3CACBD' }
                         ]),
-                        borderRadius: [4, 4, 0, 0]
+                        borderRadius: [0, 4, 4, 0] // 右侧圆角，和颜色分布的样式保持一致
                     },
                     label: {
                         show: true,
-                        position: 'top',
+                        position: 'right',
                         color: '#F0E6CF',
                         fontSize: 10,
                         formatter: '{c} %'
@@ -1021,6 +986,20 @@
             } else if(pageId === 'reasonDetail') {
                 document.getElementById('reasonDetailPage').style.display = 'block';
                 applyDetailFilters();
+            }
+        }
+
+        // 页面加载自动检测登录状态.这里是为了给
+        window.onload = function() {
+            const isLogin = localStorage.getItem("isLogin") === "1";
+            if (isLogin) {
+                document.getElementById("loginBox").style.display = "none";
+                document.getElementById("mainPage").style.display = "flex";
+                initDashboard();
+                loadDataFromBackend();
+                window.addEventListener('resize', () => {
+                    [chartTrend, chartSize, chartReason, chartColor, chartStore, chartCountry].forEach(ch => ch && ch.resize());
+                });
             }
         }
     </script>
