@@ -6,8 +6,8 @@
     <title>亿星汇 | 服饰销售退货分析系统</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
-    <!-- 引入独立翻译映射文件 -->
-    <script src="translate_map.js"></script>
+    <!-- 引入独立翻译映射文件,翻译脚本优先加载，defer保证顺序执行 -->
+    <script src="translate_map.js" defer></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: radial-gradient(circle at 20% 30%, #0A1620, #03090F); font-family: 'Microsoft YaHei', sans-serif; overflow: hidden; height: 100vh; width: 100vw; }
@@ -211,7 +211,7 @@
         async function refreshBackendCache() {
             try {
                 // 本地地址，cpolar使用时替换成你的公网域名
-                await axios.get("https://2760d2b5.r21.vip.cpolar.cn/api/refresh");
+                await axios.get("https://2203904.r18.cpolar.top/api/refresh");
                 console.log("✅ 后端缓存已刷新，读取最新Excel");
             } catch (err) {
                 console.warn("自动刷新缓存失败，直接加载旧数据", err);
@@ -269,7 +269,7 @@
             try {
                 while (true) {
                     // 分页请求
-                    const res = await axios.get(`https://2760d2b5.r21.vip.cpolar.cn/api/data?page=${page}&size=${pageSize}`);
+                    const res = await axios.get(`https://2203904.r18.cpolar.top/api/data?page=${page}&size=${pageSize}`);
                     const pageData = res.data.data || [];
                     total = res.data.total;
 
@@ -286,11 +286,19 @@
                 initFilterOptions();
                 initDetailFilterOptions();
                 applyFilters();
-                // 新增：数据加载完成后，预渲染明细页面数据，解决一直加载中
-                applyDetailFilters();
+                // 延迟500ms再渲染明细，给translate_map.js预留加载时间
+                setTimeout(()=>{
+                    applyDetailFilters();
+                },500);
             } catch (error) {
-                console.error("数据加载失败：", error);
-                alert("数据加载失败，请检查后端或cpolar隧道是否正常");
+                // 打印完整详细错误，方便定位
+                console.error("====完整加载错误====" , error);
+                // 区分网络请求错误 和 JS代码执行错误
+                if(error.response){
+                    alert(`接口请求失败，HTTP状态码：${error.response.status}`);
+                }else{
+                    alert(`前端JS脚本执行异常：${error.message}，按F12打开控制台查看红色报错`);
+                }
             }
         }
 
@@ -995,7 +1003,11 @@
 
             let html = "";
             sortedList.forEach(item => {
-                const translatedRemark = translateRemark(item.remark);
+                // 兜底：如果translateRemark还未加载，直接展示原文，不崩溃
+                let translatedRemark = item.remark;
+                if (typeof translateRemark === 'function') {
+                    translatedRemark = translateRemark(item.remark);
+                }
                 html += `<tr>
                     <td>${item.size}</td>
                     <td>${item.reason}</td>
@@ -1019,10 +1031,8 @@
                 }
             } else if(pageId === 'reasonDetail') {
                 document.getElementById('reasonDetailPage').style.display = 'block';
-                // 防止rawData还没加载完成就执行渲染
-                if(rawData.length > 0){
-                    applyDetailFilters();
-                }
+                //无论数据是否加载完成，强制执行渲染，无数据就显示为空
+                applyDetailFilters();
                 
             }
         }
