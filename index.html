@@ -211,7 +211,7 @@
         async function refreshBackendCache() {
             try {
                 // 本地地址，cpolar使用时替换成你的公网域名
-                await axios.get("https://4e35b2a5.r21.vip.cpolar.cn/api/refresh");
+                await axios.get("https://47911580.r6.cpolar.cn/api/refresh");
                 console.log("✅ 后端缓存已刷新，读取最新Excel");
             } catch (err) {
                 console.warn("自动刷新缓存失败，直接加载旧数据", err);
@@ -263,13 +263,13 @@
         async function loadDataFromBackend() {
             rawData = []; // 清空旧数据
             let page = 1;
-            const pageSize = 1000; // 单次请求1000条，体积小，cpolar稳定不截断
+            const pageSize = 2000; // 单次请求1000条，体积小，cpolar稳定不截断
             let total = 0;
 
             try {
                 while (true) {
                     // 分页请求
-                    const res = await axios.get(`https://4e35b2a5.r21.vip.cpolar.cn/api/data?page=${page}&size=${pageSize}`);
+                    const res = await axios.get(`https://47911580.r6.cpolar.cn/api/data?page=${page}&size=${pageSize}`);
                     const pageData = res.data.data || [];
                     total = res.data.total;
 
