@@ -130,6 +130,8 @@
                         <div class="filter-row"><label>三级分类</label><select id="filterThirdCategory"><option>全部</option></select></div>
                         <div class="filter-row"><label>颜色</label><select id="filterColor"><option>全部</option></select></div>
                         <div class="filter-row"><label>尺码</label><select id="filterSize"><option>全部</option></select></div>
+                        <!-- 新增品名筛选 -->
+                        <div class="filter-row"><label>品名</label><select id="filterProduct"><option>全部</option></select></div>
                         <!-- 新增国家筛选 -->
                         <div class="filter-row"><label>国家</label><select id="filterCountry"><option>全部</option></select></div>
                         <!-- 新增店铺筛选 -->
@@ -169,6 +171,8 @@
                     <div class="filter-row"><label>三级分类</label><select id="detailFilterThirdCategory"><option>全部</option></select></div>
                     <div class="filter-row"><label>颜色</label><select id="detailFilterColor"><option>全部</option></select></div>
                     <div class="filter-row"><label>尺码</label><select id="detailFilterSize"><option>全部</option></select></div>
+                    <!-- 新增品名筛选 -->
+                    <div class="filter-row"><label>品名</label><select id="detailFilterProduct"><option>全部</option></select></div>
                     <!-- 明细页新增国家筛选 -->
                     <div class="filter-row"><label>国家</label><select id="detailFilterCountry"><option>全部</option></select></div>
                     <!-- 明细页新增店铺筛选 -->
@@ -187,16 +191,8 @@
                         <span>尺码分布：暂无数据</span>
                     </div>
 
-                    <div class="remark-title">📋 退货原因 & 备注明细（按出现次数排序）</div>
+                    <div class="remark-title">📋 退货原因次数 & 退货备注次数</div>
                     <table class="reason-detail-table" id="reasonDetailTable">
-                        <thead>
-                            <tr>
-                                <th>尺码</th>
-                                <th>退货原因</th>
-                                <th>原始备注（英译中）</th>
-                                <th>出现次数</th>
-                            </tr>
-                        </thead>
                         <tbody id="reasonDetailTbody">
                             <tr><td colspan="4">加载中...</td></tr>
                         </tbody>
@@ -211,7 +207,7 @@
         async function refreshBackendCache() {
             try {
                 // 本地地址，cpolar使用时替换成你的公网域名
-                await axios.get("https://2203904.r18.cpolar.top/api/refresh");
+                await axios.get("https://61138446.r21.vip.cpolar.cn/api/refresh");
                 console.log("✅ 后端缓存已刷新，读取最新Excel");
             } catch (err) {
                 console.warn("自动刷新缓存失败，直接加载旧数据", err);
@@ -269,7 +265,7 @@
             try {
                 while (true) {
                     // 分页请求
-                    const res = await axios.get(`https://2203904.r18.cpolar.top/api/data?page=${page}&size=${pageSize}`);
+                    const res = await axios.get(`https://61138446.r21.vip.cpolar.cn/api/data?page=${page}&size=${pageSize}`);
                     const pageData = res.data.data || [];
                     total = res.data.total;
 
@@ -333,6 +329,10 @@
             const sizes = [...new Set(rawData.map(row => row.尺码))];
             const sizeSelect = document.getElementById('filterSize');
             sizes.forEach(s => sizeSelect.innerHTML += `<option value="${s}">${s}</option>`);
+            // 品名
+            const products = [...new Set(rawData.map(row => row.品名))];
+            const productSelect = document.getElementById('filterProduct');
+            products.forEach(p => productSelect.innerHTML += `<option value="${p}">${p}</option>`);
             // 国家
             const countries = [...new Set(rawData.map(row => row.国家))];
             const countrySelect = document.getElementById('filterCountry');
@@ -374,6 +374,10 @@
             const sizes = [...new Set(rawData.map(row => row.尺码))];
             const sizeSelect = document.getElementById('detailFilterSize');
             sizes.forEach(s => sizeSelect.innerHTML += `<option value="${s}">${s}</option>`);
+            //新增品名筛选
+            const products = [...new Set(rawData.map(row => row.品名))];
+            const productSelect = document.getElementById('detailFilterProduct');
+            products.forEach(p => productSelect.innerHTML += `<option value="${p}">${p}</option>`);
             // 国家
             const countries = [...new Set(rawData.map(row => row.国家))];
             const countrySelect = document.getElementById('detailFilterCountry');
@@ -394,6 +398,8 @@
             const thirdCategory = document.getElementById('filterThirdCategory').value;
             const color = document.getElementById('filterColor').value;
             const size = document.getElementById('filterSize').value;
+            //增加品名筛选
+            const product = document.getElementById('filterProduct').value;
             const country = document.getElementById('filterCountry').value;
             const store = document.getElementById('filterStore').value;
 
@@ -405,6 +411,8 @@
                 if(thirdCategory !== "全部" && row.三级分类 !== thirdCategory) return false;
                 if(color !== "全部" && row.颜色 !== color) return false;
                 if(size !== "全部" && row.尺码 !== size) return false;
+                //新增品名筛选判断
+                if(product !== "全部" && row.品名 !== product) return false;
                 if(country !== "全部" && row.国家 !== country) return false;
                 if(store !== "全部" && row.店铺 !== store) return false;
                 return true;
@@ -423,6 +431,8 @@
             const thirdCategory = document.getElementById('detailFilterThirdCategory').value;
             const color = document.getElementById('detailFilterColor').value;
             const size = document.getElementById('detailFilterSize').value;
+            //增加品名筛选
+            const product = document.getElementById('detailFilterProduct').value;
             const country = document.getElementById('detailFilterCountry').value;
             const store = document.getElementById('detailFilterStore').value;
 
@@ -434,6 +444,8 @@
                 if(thirdCategory !== "全部" && row.三级分类 !== thirdCategory) return false;
                 if(color !== "全部" && row.颜色 !== color) return false;
                 if(size !== "全部" && row.尺码 !== size) return false;
+                //新增品名筛选判断
+                if(product !== "全部" && row.品名 !== product) return false;
                 if(country !== "全部" && row.国家 !== country) return false;
                 if(store !== "全部" && row.店铺 !== store) return false;
                 return true;
@@ -450,6 +462,8 @@
             document.getElementById('filterThirdCategory').value = "全部";
             document.getElementById('filterColor').value = "全部";
             document.getElementById('filterSize').value = "全部";
+            //增加品名筛选
+            document.getElementById('filterProduct').value = "全部";
             document.getElementById('filterCountry').value = "全部";
             document.getElementById('filterStore').value = "全部";
             applyFilters();
@@ -464,6 +478,8 @@
             document.getElementById('detailFilterThirdCategory').value = "全部";
             document.getElementById('detailFilterColor').value = "全部";
             document.getElementById('detailFilterSize').value = "全部";
+            //增加品名筛选
+            document.getElementById('detailFilterProduct').value = "全部";
             document.getElementById('detailFilterCountry').value = "全部";
             document.getElementById('detailFilterStore').value = "全部";
             applyDetailFilters();
@@ -738,17 +754,17 @@
                 },
                 yAxis: {
                     type: 'category',
-                    // 按退货数量降序排序，只显示前15个（避免过长）
+                    // 按退货数量降序排序，只显示前10个
                     data: Object.keys(colorReturn)
                         .sort((a, b) => colorReturn[b] - colorReturn[a])
-                        .slice(0, 10),  //这里是10个数据显示
+                        .slice(0, 10),
                     axisLabel: { color: '#E4D5AF', fontSize: 10 }
                 },
                 series: [{
                     type: 'bar',
                     data: Object.keys(colorReturn)
                         .sort((a, b) => colorReturn[b] - colorReturn[a])
-                        .slice(0, 10) //这里是10个数据显示
+                        .slice(0, 10)
                         .map(k => colorReturn[k]),
                     itemStyle: {
                         color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
@@ -761,7 +777,13 @@
                         show: true,
                         position: 'right',
                         color: '#F0E6CF',
-                        fontSize: 9
+                        fontSize: 9,
+                        formatter: function(params) {
+                            // 计算全部颜色退货总和
+                            const total = Object.values(colorReturn).reduce((sum, val) => sum + val, 0);
+                            const percent = total > 0 ? ((params.value / total) * 100).toFixed(1) : 0;
+                            return `${percent}%`;
+                        }
                     }
                 }]
             });
@@ -962,59 +984,132 @@
             let totalInfoDom = document.getElementById('detailTotalInfo');
             if(!tbody || !totalInfoDom) return;
 
-            const validData = data.filter(row => {
+            // 提取退货原因括号内中文的工具函数
+            function getReasonChinese(fullText) {
+                if (!fullText) return "未知原因";
+                const match = fullText.match(/\((.+?)\)/);
+                if (match && match[1]) {
+                    return match[1];
+                }
+                return fullText;
+            }
+
+            // 顶部全局尺码统计文字
+            const totalNum = data.length;
+            const allSizeStat = {};
+            data.forEach(row => {
+                const s = row.尺码 || "未知尺码";
+                allSizeStat[s] = (allSizeStat[s] || 0) + 1;
+            });
+            let sizeText = "";
+            for(let s in allSizeStat){
+                sizeText += `${s}:${allSizeStat[s]}条 `;
+            }
+            if(!sizeText) sizeText = "暂无数据";
+            totalInfoDom.innerHTML = `<span>数据总条数：${totalNum}</span><span>整体尺码分布：${sizeText}</span>`;
+
+            // ====================== 第一块：原有 尺码-退货原因多维统计 ======================
+            const rawReasonSet = new Set();
+            const sizeReasonCount = {};
+            data.forEach(row => {
+                const size = row.尺码 || "未知尺码";
+                const rawReason = row.退货原因 || "未知原因";
+                rawReasonSet.add(rawReason);
+                if(!sizeReasonCount[size]) sizeReasonCount[size] = {};
+                sizeReasonCount[size][rawReason] = (sizeReasonCount[size][rawReason] || 0) + 1;
+            });
+            const rawToChineseMap = {};
+            Array.from(rawReasonSet).forEach(raw => {
+                rawToChineseMap[raw] = getReasonChinese(raw);
+            });
+            // 过滤掉未知原因列
+            const chineseColumns = [...new Set(Object.values(rawToChineseMap))].filter(name => name !== "未知原因");
+
+            // 每列全局合计
+            const colTotalMap = {};
+            chineseColumns.forEach(cn => colTotalMap[cn] = 0);
+            data.forEach(row => {
+                const raw = row.退货原因 || "未知原因";
+                const cnText = rawToChineseMap[raw];
+                if(cnText !== "未知原因"){
+                    colTotalMap[cnText] += 1;
+                }
+            });
+            const grandAllTotal = Object.values(colTotalMap).reduce((a,b)=>a+b,0);
+
+            // ====================== 第二块：新增 尺码+退货备注+次数排行 ======================
+            // 筛选有有效备注的数据
+            const validRemarkData = data.filter(row => {
                 const remark = row.退货备注?.trim() || "";
                 return remark !== "" && remark !== "无";
             });
-
-            const totalNum = data.length;
-            const sizeStat = {};
-            data.forEach(row => {
-                const s = row.尺码 || "未知尺码";
-                sizeStat[s] = (sizeStat[s] || 0) + 1;
-            });
-            let sizeText = "";
-            for(let s in sizeStat){
-                sizeText += `${s}:${sizeStat[s]}条 `;
-            }
-            if(!sizeText) sizeText = "暂无数据";
-            totalInfoDom.innerHTML = `<span>数据总条数：${totalNum}</span><span>尺码分布：${sizeText}</span>`;
-
-            if (validData.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="4">暂无有效备注数据</td></tr>';
-                return;
-            }
-
-            const groupCount = {};
-            validData.forEach(row => {
-                const size = row.尺码 || "未知";
-                const reason = row.退货原因 || "未知原因";
+            // 聚合：尺码+备注 统计次数
+            const remarkGroup = {};
+            validRemarkData.forEach(row => {
+                const size = row.尺码 || "未知尺码";
                 const remark = row.退货备注.trim();
-                const key = `${size}|${reason}|${remark}`;
-                groupCount[key] = (groupCount[key] || 0) + 1;
+                const key = `${size}|${remark}`;
+                remarkGroup[key] = (remarkGroup[key] || 0) + 1;
             });
-
-            const sortedList = Object.entries(groupCount)
-                .sort((a, b) => b[1] - a[1])
-                .map(([key, count]) => {
-                    const [size, reason, remark] = key.split('|');
-                    return { size, reason, remark, count };
+            // 按次数降序排序
+            const remarkList = Object.entries(remarkGroup)
+                .sort((a,b) => b[1] - a[1])
+                .map(([key, cnt]) => {
+                    const [size, remark] = key.split("|");
+                    return { size, remark, count: cnt };
                 });
 
+            // ========== 拼接完整HTML ==========
             let html = "";
-            sortedList.forEach(item => {
-                // 兜底：如果translateRemark还未加载，直接展示原文，不崩溃
-                let translatedRemark = item.remark;
-                if (typeof translateRemark === 'function') {
-                    translatedRemark = translateRemark(item.remark);
-                }
-                html += `<tr>
-                    <td>${item.size}</td>
-                    <td>${item.reason}</td>
-                    <td>${translatedRemark}</td>
-                    <td>${item.count}</td>
-                </tr>`;
+            // ========== 区块1：尺码-退货原因多维表 ==========
+            html += `<tr><td colspan="${chineseColumns.length + 2}" style="background:rgba(198,168,98,0.15);font-weight:bold;color:#F3D77C;">📊 功能1：尺码-退货原因多维统计表</td></tr>`;
+            html += `<tr><th>尺码</th>`;
+            chineseColumns.forEach(cnName => html += `<th>${cnName}</th>`);
+            html += `<th>总计</th></tr>`;
+            // 尺码行数据
+            Object.entries(sizeReasonCount).forEach(([size, reasonObj]) => {
+                html += `<tr><td>${size}</td>`;
+                chineseColumns.forEach(cnName => {
+                    let num = 0;
+                    Object.entries(reasonObj).forEach(([rawKey, val]) => {
+                        if(rawToChineseMap[rawKey] === cnName) num += val;
+                    });
+                    html += `<td>${num}</td>`;
+                });
+                // 该行有效合计（剔除未知原因）
+                let rowValidSum = 0;
+                Object.entries(reasonObj).forEach(([rawKey, val]) => {
+                    if(rawToChineseMap[rawKey] !== "未知原因") rowValidSum += val;
+                });
+                html += `<td><strong>${rowValidSum}</strong></td></tr>`;
             });
+            // 底部总合计行
+            html += `<tr style="background:rgba(198,168,98,0.2);">
+                <td><strong>总计</strong></td>`;
+            chineseColumns.forEach(cnName => html += `<td><strong>${colTotalMap[cnName]}</strong></td>`);
+            html += `<td><strong>${grandAllTotal}</strong></td></tr>`;
+
+            // ========== 区块2：新增 尺码-退货备注频次排行 ==========
+            html += `<tr><td colspan="${chineseColumns.length + 2}" style="height:15px;"></tr>`; // 空行分隔两个表格
+            html += `<tr><td colspan="${chineseColumns.length + 2}" style="background:rgba(198,168,98,0.15);font-weight:bold;color:#F3D77C;">📝 功能2：尺码+退货备注频次排行（次数从大到小）</td></tr>`;
+            // 表头：尺码、退货备注、出现次数
+            html += `<tr>
+                <th>尺码</th>
+                <th>退货备注</th>
+                <th>出现次数</th>
+            </tr>`;
+            if(remarkList.length === 0){
+                html += `<tr><td colspan="3">暂无有效退货备注数据</td></tr>`;
+            }else{
+                remarkList.forEach(item => {
+                    html += `<tr>
+                        <td>${item.size}</td>
+                        <td>${item.remark}</td>
+                        <td><strong>${item.count}</strong></td>
+                    </tr>`;
+                });
+            }
+
             tbody.innerHTML = html;
         }
 
