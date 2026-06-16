@@ -211,7 +211,7 @@
         async function refreshBackendCache() {
             try {
                 // 本地地址，cpolar使用时替换成你的公网域名
-                await axios.get("https://21e5d812.r6.cpolar.cn/api/refresh");
+                await axios.get("https://4c3b33f1.r18.cpolar.top/api/refresh");
                 console.log("✅ 后端缓存已刷新，读取最新Excel");
             } catch (err) {
                 console.warn("自动刷新缓存失败，直接加载旧数据", err);
@@ -269,7 +269,7 @@
             try {
                 while (true) {
                     // 分页请求
-                    const res = await axios.get(`https://21e5d812.r6.cpolar.cn/api/data?page=${page}&size=${pageSize}`);
+                    const res = await axios.get(`https://4c3b33f1.r18.cpolar.top/api/data?page=${page}&size=${pageSize}`);
                     const pageData = res.data.data || [];
                     total = res.data.total;
 
@@ -286,6 +286,8 @@
                 initFilterOptions();
                 initDetailFilterOptions();
                 applyFilters();
+                // 新增：数据加载完成后，预渲染明细页面数据，解决一直加载中
+                applyDetailFilters();
             } catch (error) {
                 console.error("数据加载失败：", error);
                 alert("数据加载失败，请检查后端或cpolar隧道是否正常");
@@ -1017,7 +1019,11 @@
                 }
             } else if(pageId === 'reasonDetail') {
                 document.getElementById('reasonDetailPage').style.display = 'block';
-                applyDetailFilters();
+                // 防止rawData还没加载完成就执行渲染
+                if(rawData.length > 0){
+                    applyDetailFilters();
+                }
+                
             }
         }
 
